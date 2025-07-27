@@ -23,11 +23,3 @@
 - 原生 HTML 表单，无框架依赖
 
 ---
-
-## 🚀 快速部署
-
-### 1. 克隆本项目
-
-```bash
-git clone https://github.com/your-username/cloudflare-workers-login.git
-cd cloudflare-workers-login
