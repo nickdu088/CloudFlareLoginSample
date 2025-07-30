@@ -50,10 +50,13 @@ export default {
         });
       }
 
+      // Set expire to 1 minute before now
+      const expireDate = new Date(Date.now() - 60 * 1000).toISOString();
+
       await env.USERS.prepare(
         `INSERT INTO users (email, name, password, expire, status)
          VALUES (?, ?, ?, ?, ?)`
-      ).bind(email, name, password, '2000-01-01T00:00:00.000Z', 0).run();
+      ).bind(email, name, password, expireDate, 0).run();
 
       return Response.redirect(`${url.origin}/wait-pay?email=${encodeURIComponent(email)}`, 302);
     }
@@ -87,7 +90,7 @@ export default {
       if (now >= expireDate) {
         await env.USERS.prepare(
           'UPDATE users SET expire = ? WHERE email = ?'
-        ).bind('2000-01-01T00:00:00.000Z', email).run();
+        ).bind(new Date(Date.now() - 60 * 1000).toISOString(), email).run();
 
         return Response.redirect(`${url.origin}/wait-pay?email=${encodeURIComponent(email)}`, 302);
       }
@@ -144,15 +147,15 @@ export default {
       }
 
       const user = await env.USERS.prepare(
-        "SELECT * FROM users WHERE expire = '2000-01-01T00:00:00.000Z' LIMIT 1"
-      ).first();
+        "SELECT * FROM users WHERE expire <= ? AND status = 0 LIMIT 1"
+      ).bind(new Date().toISOString()).first();
 
       if (!user) {
         return new Response('无待支付用户', { status: 404 });
       }
 
       await env.USERS.prepare(
-        'UPDATE users SET expire = ? WHERE email = ?'
+        'UPDATE users SET expire = ?, status = 1 WHERE email = ?'
       ).bind(expire, user.email).run();
 
       return new Response('支付成功，用户已激活');
