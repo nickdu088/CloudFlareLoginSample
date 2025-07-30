@@ -34,19 +34,27 @@ export default {
       const name = form.get('name');
       const email = form.get('email');
       const password = form.get('password');
+
       if (!name || !email || !password) {
         return new Response('缺少字段', { status: 400 });
       }
-      const existsRaw = await env.USERS.get(email);
-      if (existsRaw) {
+
+      const exists = await env.USERS.prepare(
+        'SELECT * FROM users WHERE email = ?'
+      ).bind(email).first();
+
+      if (exists) {
         return new Response('<h1>邮箱已注册</h1><a href="/register">返回注册</a>', {
           headers: { 'Content-Type': 'text/html; charset=utf-8' },
           status: 409,
         });
       }
-      // 默认过期日期为远过去的时间，表示未激活
-      const user = { email, name, password, expire: '2000-01-01T00:00:00.000Z' };
-      await env.USERS.put(email, JSON.stringify(user));
+
+      await env.USERS.prepare(
+        `INSERT INTO users (email, name, password, expire, status)
+         VALUES (?, ?, ?, ?, ?)`
+      ).bind(email, name, password, '2000-01-01T00:00:00.000Z', 0).run();
+
       return Response.redirect(`${url.origin}/wait-pay?email=${encodeURIComponent(email)}`, 302);
     }
 
@@ -55,28 +63,35 @@ export default {
       const form = await request.formData();
       const email = form.get('email');
       const password = form.get('password');
-      const userRaw = await env.USERS.get(email);
-      if (!userRaw) {
+
+      const user = await env.USERS.prepare(
+        'SELECT * FROM users WHERE email = ?'
+      ).bind(email).first();
+
+      if (!user) {
         return new Response('<h1>用户不存在</h1><a href="/">返回登录</a>', {
           headers: { 'Content-Type': 'text/html; charset=utf-8' },
           status: 401,
         });
       }
-      const user = JSON.parse(userRaw);
+
       if (password !== user.password) {
         return new Response('<h1>密码错误</h1><a href="/">返回登录</a>', {
           headers: { 'Content-Type': 'text/html; charset=utf-8' },
           status: 401,
         });
       }
+
       const now = new Date();
       const expireDate = new Date(user.expire);
       if (now >= expireDate) {
-        // 过期用户重置过期时间为默认，并跳转到支付页
-        user.expire = '2000-01-01T00:00:00.000Z';
-        await env.USERS.put(email, JSON.stringify(user));
+        await env.USERS.prepare(
+          'UPDATE users SET expire = ? WHERE email = ?'
+        ).bind('2000-01-01T00:00:00.000Z', email).run();
+
         return Response.redirect(`${url.origin}/wait-pay?email=${encodeURIComponent(email)}`, 302);
       }
+
       return new Response(loginSuccessPage(user.name), {
         headers: {
           'Content-Type': 'text/html; charset=utf-8',
@@ -96,7 +111,7 @@ export default {
       });
     }
 
-    // 等待付款页面（无模拟支付按钮）
+    // 等待付款页面
     if (url.pathname === '/wait-pay' && method === 'GET') {
       const email = url.searchParams.get('email');
       if (!email) {
@@ -107,48 +122,40 @@ export default {
       });
     }
 
-    // 检查是否过期接口
+    // 检查是否过期
     if (url.pathname === '/check-expired' && method === 'GET') {
       const email = url.searchParams.get('email');
-      if (!email) {
-        return new Response(JSON.stringify({ expired: true }), {
-          headers: { 'Content-Type': 'application/json' },
-        });
-      }
-      const userRaw = await env.USERS.get(email);
-      if (!userRaw) {
-        return new Response(JSON.stringify({ expired: true }), {
-          headers: { 'Content-Type': 'application/json' },
-        });
-      }
-      const user = JSON.parse(userRaw);
-      const now = new Date();
-      const expireDate = new Date(user.expire);
-      return new Response(JSON.stringify({ expired: now >= expireDate }), {
+      const result = await env.USERS.prepare(
+        'SELECT expire FROM users WHERE email = ?'
+      ).bind(email).first();
+
+      const expired = !result || new Date() >= new Date(result.expire);
+      return new Response(JSON.stringify({ expired }), {
         headers: { 'Content-Type': 'application/json' },
       });
     }
 
-    // 模拟支付接口（保留POST，更新用户expire）
+    // 模拟支付
     if (url.pathname === '/simulate-pay' && method === 'POST') {
       const data = await request.json();
       const expire = data.expire;
       if (!expire) {
         return new Response('缺少 expire 字段', { status: 400 });
       }
-      // 找到第一个默认expire用户，更新expire
-      const listResponse = await env.USERS.list();
-      for (const key of listResponse.keys) {
-        const userRaw = await env.USERS.get(key.name);
-        if (!userRaw) continue;
-        const user = JSON.parse(userRaw);
-        if (user.expire === '2000-01-01T00:00:00.000Z') {
-          user.expire = expire;
-          await env.USERS.put(user.email, JSON.stringify(user));
-          return new Response('支付成功，用户已激活');
-        }
+
+      const user = await env.USERS.prepare(
+        "SELECT * FROM users WHERE expire = '2000-01-01T00:00:00.000Z' LIMIT 1"
+      ).first();
+
+      if (!user) {
+        return new Response('无待支付用户', { status: 404 });
       }
-      return new Response('无待支付用户', { status: 404 });
+
+      await env.USERS.prepare(
+        'UPDATE users SET expire = ? WHERE email = ?'
+      ).bind(expire, user.email).run();
+
+      return new Response('支付成功，用户已激活');
     }
 
     // 注册成功页面访问路径
