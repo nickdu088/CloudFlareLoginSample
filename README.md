@@ -6,11 +6,14 @@
 
 ## ✨ 功能特性
 
-- ✅ 用户注册（保存至 Cloudflare KV）
-- ✅ 用户登录（校验账号密码）
+- ✅ 用户注册（保存至 Cloudflare D1 SQL Database）
+- ✅ 等待用户付款
+- ✅ 用户过期/付款重定向
+- ✅ 用户登录（校验账号密码和用户过期状态）
 - ✅ 登录状态通过 Cookie 维持（有效期 9 分钟）
 - ✅ 登录后访问主页
 - ✅ 登出功能（清除 Cookie）
+- ✅ 清理注册24小时内未付款的新用户
 - ✅ 所有页面使用 Tailwind CSS 编写
 
 ---
@@ -18,7 +21,7 @@
 ## 🛠️ 技术栈
 
 - [Cloudflare Workers](https://developers.cloudflare.com/workers/)
-- [KV 存储](https://developers.cloudflare.com/workers/platform/sites/configuration#kv-namespaces)
+- [Cloudflare D1 SQL Database](https://developers.cloudflare.com/d1/)
 - [Tailwind CSS](https://tailwindcss.com/) (CDN 引入)
 - 原生 HTML 表单，无框架依赖
 
