@@ -1,4 +1,17 @@
 export default {
+  async scheduled(controller, env, ctx) {
+    // Calculate cutoff time: 24 hours ago in ISO format (UTC)
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+    // Delete users with status 0 whose expire timestamp is before cutoff
+    const result = await env.USERS.prepare(`
+      DELETE FROM users
+      WHERE status = 0 AND expire <= ?
+    `).bind(cutoff).run();
+
+    console.log(`Deleted ${result.meta.changes} expired users.`);
+  },
+
   async fetch(request, env) {
     const url = new URL(request.url);
     const method = request.method;
@@ -171,18 +184,6 @@ export default {
     return new Response('Not Found', { status: 404 });
   },
 };
-
-export const scheduled = {
-  async run(env, ctx) {
-    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-
-    await env.USERS.prepare(`
-      DELETE FROM users
-      WHERE status = 0 AND expire <= ?
-    `).bind(cutoff).run();
-  }
-};
-
 
 // 页面 HTML 模板
 
