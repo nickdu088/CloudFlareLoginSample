@@ -101,9 +101,9 @@ export default {
       const now = new Date();
       const expireDate = new Date(user.expire);
       if (now >= expireDate) {
-        await env.USERS.prepare(
-          'UPDATE users SET expire = ? WHERE email = ?'
-        ).bind(new Date(Date.now() - 60 * 1000).toISOString(), email).run();
+        // await env.USERS.prepare(
+        //   'UPDATE users SET expire = ? WHERE email = ?'
+        // ).bind(new Date(Date.now() - 60 * 1000).toISOString(), email).run();
 
         return Response.redirect(`${url.origin}/wait-pay?email=${encodeURIComponent(email)}`, 302);
       }
@@ -191,19 +191,85 @@ const loginPage = `<!DOCTYPE html><html lang="zh"><head><meta charset="UTF-8"/><
 
 const registerPage = `<!DOCTYPE html><html lang="zh"><head><meta charset="UTF-8"/><title>注册</title><script src="https://cdn.tailwindcss.com"></script></head><body class="bg-gray-100 flex items-center justify-center min-h-screen"><div class="bg-white p-8 rounded shadow-md w-full max-w-md"><h1 class="text-2xl font-bold text-center mb-6">创建账户</h1><form method="POST" action="/register"><div class="mb-4"><label class="block text-gray-700 mb-2">用户名</label><input name="name" type="text" required class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-green-400" placeholder="你的昵称"></div><div class="mb-4"><label class="block text-gray-700 mb-2">邮箱</label><input name="email" type="email" required class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-green-400" placeholder="you@example.com"></div><div class="mb-6"><label class="block text-gray-700 mb-2">密码</label><input name="password" type="password" required class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-green-400" placeholder="••••••••"></div><button type="submit" class="w-full bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded">注册</button></form><p class="text-center text-sm text-gray-500 mt-4">已有账号？<a href="/" class="text-green-500 hover:underline">登录</a></p></div></body></html>`;
 
-const waitPayPage = (email) => `<!DOCTYPE html><html lang="zh"><head><meta charset="UTF-8"/><title>等待付款</title><script src="https://cdn.tailwindcss.com"></script><script>
-async function checkExpired() {
-  const resp = await fetch('/check-expired?email=${encodeURIComponent(email)}');
-  const data = await resp.json();
-  if (!data.expired) {
-    window.location.href = '/success';
-  } else {
-    setTimeout(checkExpired, 3000);
-  }
-}
-window.onload = checkExpired;
-</script></head><body class="bg-yellow-100 flex flex-col items-center justify-center min-h-screen gap-4"><h1 class="text-2xl font-bold text-yellow-800">您的账户尚未付款或者已经过期</h1><p>请完成支付。</p><p>支付后页面将自动跳转。</p></body></html>`;
+const waitPayPage = (email) => `<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <title>等待付款</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    async function checkExpired() {
+      const resp = await fetch('/check-expired?email=${encodeURIComponent(email)}');
+      const data = await resp.json();
+      if (!data.expired) {
+        window.location.href = '/success';
+      } else {
+        setTimeout(checkExpired, 3000);
+      }
+    }
+    window.onload = checkExpired;
+  </script>
+</head>
+<body class="bg-yellow-100 min-h-screen flex flex-col items-center py-10 px-4">
+
+  <!-- Pricing Section -->
+  <div class="w-full max-w-7xl">
+    <h2 class="text-center text-3xl font-extrabold text-gray-800 md:text-5xl mb-10">套餐与价格</h2>
+
+    <div class="flex flex-col gap-6 md:flex-row md:gap-8">
+      <!-- 免费 Plan -->
+      <div class="flex-1 rounded-2xl bg-white p-6 shadow-lg hover:shadow-xl transition">
+        <h3 class="text-3xl font-bold text-indigo-600">￥0<span class="text-sm text-gray-400"> /永久</span></h3>
+        <p class="mt-2 text-xl font-semibold">体验基础功能，适合初次尝试</p>
+        <ul class="mt-4 space-y-3 text-sm text-gray-700">
+          <li>✅ 7天无限体验</li>
+          <li>✅ 无插播广告</li>
+          <li>✅ 永久免费</li>
+          <li>✅ 循环续费</li>
+        </ul>
+        <!-- 保留按钮 -->
+        <a href="/free?email=${encodeURIComponent(email)}" class="mt-6 inline-block w-full rounded-xl bg-indigo-500 px-5 py-3 text-center font-semibold text-white hover:bg-indigo-600 transition">选择套餐</a>
+      </div>
+
+      <!-- 1个月 Plan -->
+      <div class="flex-1 rounded-2xl bg-white p-6 shadow-lg hover:shadow-xl transition border border-indigo-200">
+        <h3 class="text-3xl font-bold text-indigo-600">￥29<span class="text-sm text-gray-400"> /月</span></h3>
+        <p class="mt-2 text-xl font-semibold">适合短期用户</p>
+        <div class="mt-6 text-center">
+          <img src="https://via.placeholder.com/150x150.png?text=WeChat+Pay+1M" alt="微信支付二维码" class="mx-auto w-36 h-36 rounded-lg border">
+          <p class="mb-2 text-sm text-gray-600">使用微信扫码支付</p>
+          <p class="text-xs text-gray-500 mt-2">请在付款备注中填写您的邮箱：<br><strong>${email}</strong></p>
+        </div>
+      </div>
+
+      <!-- 1年 Plan -->
+      <div class="flex-1 rounded-2xl bg-white p-6 shadow-lg hover:shadow-xl transition">
+        <h3 class="text-3xl font-bold text-indigo-600">￥199<span class="text-sm text-gray-400"> /年</span></h3>
+        <p class="mt-2 text-xl font-semibold">重度用户专属，性价比高</p>
+        <div class="mt-6 text-center">
+          <img src="https://via.placeholder.com/150x150.png?text=WeChat+Pay+1Y" alt="微信支付二维码" class="mx-auto w-36 h-36 rounded-lg border">
+          <p class="mb-2 text-sm text-gray-600">使用微信扫码支付</p>
+          <p class="text-xs text-gray-500 mt-2">请在付款备注中填写您的邮箱：<br><strong>${email}</strong></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Payment Reminder Section -->
+  <div class="mt-12 text-center bg-white/70 px-6 py-5 rounded-xl shadow-md max-w-xl">
+    <h1 class="text-xl font-bold text-yellow-800 mb-2">您的账户尚未付款或者已经过期</h1>
+    <p class="text-yellow-700">请完成支付。</p>
+    <p class="text-yellow-600">支付后页面将自动跳转。</p>
+    <div class="mt-4 text-sm text-gray-500 animate-pulse">
+      正在检测支付状态，请勿关闭页面...
+    </div>
+  </div>
+
+</body>
+</html>`;
 
 const loginSuccessPage = (name) => `<!DOCTYPE html><html lang="zh"><head><meta charset="UTF-8"/><title>登录成功</title><script src="https://cdn.tailwindcss.com"></script></head><body class="bg-green-100 flex flex-col items-center justify-center min-h-screen gap-4"><h1 class="text-3xl font-bold text-green-800">欢迎，${name}！</h1><p>您已成功登录。</p><a href="/logout" class="bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded">退出登录</a></body></html>`;
 
 const successPage = `<!DOCTYPE html><html lang="zh"><head><meta charset="UTF-8"/><title>激活成功</title><script src="https://cdn.tailwindcss.com"></script></head><body class="bg-green-200 flex flex-col items-center justify-center min-h-screen gap-4"><h1 class="text-3xl font-bold text-green-900">激活成功！</h1><p>您现在可以登录使用服务。</p><a href="/" class="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded">返回登录</a></body></html>`;
+
+const homePage = `<!DOCTYPE html><html lang="zh"><head><meta charset="UTF-8"/><title>主页</title><script src="https://cdn.tailwindcss.com"></script></head><body class="bg-white flex flex-col items-center justify-center min-h-screen gap-4"><h1 class="text-3xl font-bold text-green-700">欢迎访问主页！你已登录。</h1><a href="/logout" class="bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded">登出</a></body></html>`;
